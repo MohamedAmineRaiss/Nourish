@@ -1,0 +1,77 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-display: "DM Serif Display", Georgia, serif;
+  --font-body: "DM Sans", system-ui, sans-serif;
+}
+
+:root {
+  --ring-bg: #F0EBE3;
+  --page-bg: #FBF8F4;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ring-bg: #333028;
+    --page-bg: #1A1816;
+  }
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background: var(--page-bg);
+  font-family: var(--font-body), system-ui, sans-serif;
+  overscroll-behavior-y: none;
+}
+
+/* Safe area for iPhone notch / home indicator */
+.safe-area-bottom {
+  padding-bottom: max(18px, env(safe-area-inset-bottom));
+}
+
+/* Animations */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(-16px) scale(0.95); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+
+.animate-page {
+  animation: fadeInUp 0.35s ease-out;
+}
+
+.animate-toast {
+  animation: toastIn 0.3s ease-out;
+}
+
+/* RTL helpers */
+[dir="rtl"] .ms-2 { margin-right: 0.5rem; margin-left: 0; }
+[dir="rtl"] .me-2 { margin-left: 0.5rem; margin-right: 0; }
+
+/* Remove default input styles on iOS */
+input[type="text"],
+input[type="number"],
+input[type="search"] {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #C4BAB0; border-radius: 4px; }
+
+/* Custom checkbox-like pill for search results */
+.food-result:active {
+  transform: scale(0.98);
+}
