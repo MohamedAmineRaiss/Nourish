@@ -1,6 +1,6 @@
 'use client';
+import { Locale } from '@/types';
 import { t } from '@/lib/i18n';
-import type { Locale } from '@/types';
 
 interface Props {
   page: string;
@@ -8,41 +8,38 @@ interface Props {
   locale: Locale;
 }
 
-const NAV_ITEMS = [
+const tabs = [
   { id: 'dashboard', icon: '🏠', labelKey: 'nav.home' },
-  { id: 'plan', icon: '🍳', labelKey: 'nav.plan', aliases: ['suggestions', 'planned'] },
-  { id: 'tracker', icon: '📊', labelKey: 'nav.track' },
+  { id: 'plan', icon: '🍳', labelKey: 'nav.plan' },
+  { id: 'stock', icon: '🛒', labelKey: 'nav.stock' },
+  { id: 'suggest', icon: '✨', labelKey: 'nav.suggest' },
   { id: 'settings', icon: '⚙️', labelKey: 'nav.settings' },
 ];
 
 export default function BottomNav({ page, setPage, locale }: Props) {
+  // Map sub-pages to their parent tab
+  const activeTab = ['suggestions', 'planned'].includes(page) ? 'plan'
+    : ['tracker', 'weekly'].includes(page) ? 'dashboard'
+    : page;
+
   return (
-    <nav className="fixed bottom-0 inset-x-0 z-50 bg-white dark:bg-bark-700 border-t border-cream-300 dark:border-bark-400 flex justify-around items-end pb-5 pt-2 max-w-[520px] mx-auto safe-area-bottom">
-      {NAV_ITEMS.map((item) => {
-        const isActive = page === item.id || (item.aliases?.includes(page));
-        return (
+    <nav className="fixed bottom-0 inset-x-0 z-50 bg-white/95 dark:bg-bark-700/95 backdrop-blur-lg border-t border-cream-300 dark:border-bark-400 safe-area-bottom">
+      <div className="max-w-[520px] mx-auto flex justify-around items-center py-2">
+        {tabs.map((tab) => (
           <button
-            key={item.id}
-            onClick={() => setPage(item.id)}
-            className="flex flex-col items-center gap-0.5 px-4 py-1 bg-transparent border-none"
+            key={tab.id}
+            onClick={() => setPage(tab.id)}
+            className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all ${
+              activeTab === tab.id
+                ? 'text-terra-500 scale-105'
+                : 'text-bark-200 dark:text-bark-100'
+            }`}
           >
-            <span
-              className="text-[22px] transition-all duration-200"
-              style={{ filter: isActive ? 'none' : 'grayscale(0.8) opacity(0.45)' }}
-            >
-              {item.icon}
-            </span>
-            <span className={`text-[11px] font-body transition-colors duration-200 ${
-              isActive ? 'font-bold text-terra-500 dark:text-terra-400' : 'font-medium text-bark-100 dark:text-bark-100'
-            }`}>
-              {t(item.labelKey, locale)}
-            </span>
-            {isActive && (
-              <div className="w-1 h-1 rounded-full bg-terra-500 dark:bg-terra-400 mt-0.5" />
-            )}
+            <span className="text-xl">{tab.icon}</span>
+            <span className="font-body text-[10px] font-semibold">{t(tab.labelKey, locale)}</span>
           </button>
-        );
-      })}
+        ))}
+      </div>
     </nav>
   );
 }
