@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Locale, MealType, NutrientValues, MEAL_TYPES } from '@/types';
+import { Locale, MealType, NutrientValues, MEAL_TYPES, DietaryPref } from '@/types';
 import { t } from '@/lib/i18n';
 import Card from '@/components/Card';
 import Btn from '@/components/Btn';
@@ -11,6 +11,7 @@ type MealSuggesterProps = {
   deviceId: string;
   dailyIntake: NutrientValues;
   targets: NutrientValues;
+  dietaryPrefs: DietaryPref[];
 };
 
 interface SuggestedMeal {
@@ -18,9 +19,12 @@ interface SuggestedMeal {
   description: string;
   ingredients: { name: string; grams: number }[];
   cooking_tip: string;
+  prep_minutes?: number;
+  simplicity?: number;
+  nutrition_note?: string;
 }
 
-export default function MealSuggester({ locale, deviceId, dailyIntake, targets }: MealSuggesterProps) {
+export default function MealSuggester({ locale, deviceId, dailyIntake, targets, dietaryPrefs }: MealSuggesterProps) {
   const [mode, setMode] = useState<'stock' | 'custom'>('stock');
   const [mealType, setMealType] = useState<MealType>('lunch');
   const [customIngredients, setCustomIngredients] = useState('');
@@ -49,6 +53,7 @@ export default function MealSuggester({ locale, deviceId, dailyIntake, targets }
           meal_type: mealType,
           daily_intake: dailyIntake,
           targets,
+          dietary_prefs: dietaryPrefs,
         }),
       });
 
@@ -73,7 +78,14 @@ export default function MealSuggester({ locale, deviceId, dailyIntake, targets }
         {t('suggest.subtitle', locale)}
       </p>
 
-      {/* Mode selector */}
+      {/* Dietary pref hint */}
+      {dietaryPrefs.length > 0 && (
+        <p className="font-body text-[11px] text-terra-500 font-semibold -mt-2">
+          ✓ {t('suggest.respectingDiet', locale)}: {dietaryPrefs.join(', ')}
+        </p>
+      )}
+
+      {/* Mode */}
       <div className="flex gap-2">
         {(['stock', 'custom'] as const).map(m => (
           <button
@@ -107,7 +119,6 @@ export default function MealSuggester({ locale, deviceId, dailyIntake, targets }
         ))}
       </div>
 
-      {/* Custom ingredients input */}
       {mode === 'custom' && (
         <textarea
           value={customIngredients}
@@ -121,20 +132,42 @@ export default function MealSuggester({ locale, deviceId, dailyIntake, targets }
         {loading ? t('suggest.generating', locale) : `✨ ${t('suggest.generate', locale)}`}
       </Btn>
 
-      {/* Message */}
       {message && (
         <Card>
           <p className="font-body text-sm text-bark-200 dark:text-bark-100 text-center py-2">{message}</p>
         </Card>
       )}
 
-      {/* Suggestions */}
       {suggestions.map((meal, i) => (
         <Card key={i}>
-          <h3 className="font-display text-[16px] text-bark-500 dark:text-cream-200 mb-1">{meal.name}</h3>
-          <p className="font-body text-[13px] text-bark-200 dark:text-bark-100 mb-3">{meal.description}</p>
+          <div className="flex justify-between items-start mb-1 gap-2">
+            <h3 className="font-display text-[16px] text-bark-500 dark:text-cream-200">{meal.name}</h3>
+            {/* Quick badges: prep time + simplicity */}
+            <div className="flex items-center gap-1 flex-shrink-0">
+              {typeof meal.prep_minutes === 'number' && (
+                <span className="bg-cream-200 dark:bg-bark-400 rounded-lg px-2 py-0.5 font-body text-[11px] font-semibold text-bark-500 dark:text-cream-200">
+                  ⏱ {meal.prep_minutes}m
+                </span>
+              )}
+              {typeof meal.simplicity === 'number' && (
+                <span className="bg-cream-200 dark:bg-bark-400 rounded-lg px-2 py-0.5 font-body text-[11px] font-semibold text-terra-500">
+                  {'★'.repeat(Math.max(1, Math.min(5, meal.simplicity)))}
+                </span>
+              )}
+            </div>
+          </div>
 
-          <div className="flex flex-wrap gap-1.5 mb-3">
+          <p className="font-body text-[13px] text-bark-200 dark:text-bark-100 mb-2.5">
+            {meal.description}
+          </p>
+
+          {meal.nutrition_note && (
+            <p className="font-body text-[12px] text-terra-500 font-semibold mb-3 bg-terra-500/10 rounded-lg px-2.5 py-1.5">
+              📊 {meal.nutrition_note}
+            </p>
+          )}
+
+          <div className="flex flex-wrap gap-1.5 mb-2">
             {meal.ingredients.map((ing, j) => (
               <span key={j} className="bg-cream-200 dark:bg-bark-400 rounded-lg px-3 py-1.5 font-body text-[13px] font-semibold text-bark-500 dark:text-cream-200">
                 {ing.name} <span className="text-terra-500">{ing.grams}g</span>
@@ -143,7 +176,7 @@ export default function MealSuggester({ locale, deviceId, dailyIntake, targets }
           </div>
 
           {meal.cooking_tip && (
-            <p className="font-body text-xs text-bark-200 dark:text-bark-100 italic">
+            <p className="font-body text-xs text-bark-200 dark:text-bark-100 italic mt-2">
               💡 {meal.cooking_tip}
             </p>
           )}

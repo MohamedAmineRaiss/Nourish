@@ -30,6 +30,30 @@ body {
   overscroll-behavior-y: none;
 }
 
+/* ─── Accessibility: Focus-visible ring for keyboard navigation ─── */
+*:focus-visible {
+  outline: 3px solid #D4785C;
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* Don't show focus ring for mouse/touch clicks */
+*:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* ─── Reduced motion preference ─── */
+@media (prefers-reduced-motion: reduce) {
+  .animate-page,
+  .animate-toast {
+    animation: none !important;
+  }
+  * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
 /* Safe area for iPhone notch / home indicator */
 .safe-area-bottom {
   padding-bottom: max(18px, env(safe-area-inset-bottom));
@@ -61,9 +85,11 @@ body {
 /* Remove default input styles on iOS */
 input[type="text"],
 input[type="number"],
-input[type="search"] {
+input[type="search"],
+textarea {
   -webkit-appearance: none;
   appearance: none;
+  font-size: 16px; /* prevents iOS zoom on focus */
 }
 
 /* Scrollbar styling */
@@ -74,4 +100,22 @@ input[type="search"] {
 /* Custom checkbox-like pill for search results */
 .food-result:active {
   transform: scale(0.98);
+}
+
+/* ─── Skip-to-content link (screen readers + keyboard) ─── */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: #D4785C;
+  color: white;
+  padding: 8px 16px;
+  z-index: 200;
+  font-size: 14px;
+  border-radius: 0 0 8px 0;
+  transition: top 0.2s;
+}
+
+.skip-link:focus {
+  top: 0;
 }

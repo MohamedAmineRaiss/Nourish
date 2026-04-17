@@ -32,8 +32,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           rel="stylesheet"
         />
         <link rel="apple-touch-icon" href="/icon-192.svg" />
+        <meta name="color-scheme" content="light dark" />
       </head>
-      <body className="antialiased">{children}</body>
+      <body className="antialiased" role="application" aria-label="Nourish Nutrition Planner">
+        {children}
+      </body>
     </html>
   );
 }

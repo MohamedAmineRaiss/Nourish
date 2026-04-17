@@ -6,14 +6,12 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: NextRequest) {
   const deviceId = request.nextUrl.searchParams.get('device_id');
   const date = request.nextUrl.searchParams.get('date');
-  // If date is provided, get meals for that day
-  // If range=week, get last 7 days
   const range = request.nextUrl.searchParams.get('range');
+  const days = parseInt(request.nextUrl.searchParams.get('days') || '0');
 
   if (!deviceId) return NextResponse.json({ error: 'Missing device_id' }, { status: 400 });
 
   const supabase = getServerSupabase();
-
   let query = supabase.from('meals').select('*').eq('device_id', deviceId);
 
   if (range === 'week') {
@@ -21,6 +19,11 @@ export async function GET(request: NextRequest) {
     const weekAgo = new Date(today);
     weekAgo.setDate(today.getDate() - 7);
     query = query.gte('date', weekAgo.toISOString().split('T')[0]);
+  } else if (days > 0) {
+    const today = new Date();
+    const from = new Date(today);
+    from.setDate(today.getDate() - days);
+    query = query.gte('date', from.toISOString().split('T')[0]);
   } else if (date) {
     query = query.eq('date', date);
   }
@@ -38,17 +41,13 @@ export async function POST(request: NextRequest) {
 
   const supabase = getServerSupabase();
 
-  // 1. Save the meal
   const { data, error } = await supabase
     .from('meals')
     .insert({
-      device_id,
-      date,
+      device_id, date,
       name: name || meal_type || 'Meal',
       meal_type: meal_type || 'lunch',
-      nutrients,
-      foods,
-      time,
+      nutrients, foods, time,
       created_at: new Date().toISOString(),
     })
     .select()
@@ -56,10 +55,13 @@ export async function POST(request: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // 2. Deduct from stock (if foods have food_id)
+  // Deduct from stock (if foods have food_id)
   if (foods && Array.isArray(foods)) {
     for (const food of foods) {
       if (food.food_id && food.grams > 0) {
+        // Skip custom foods (food_id starts with "custom:")
+        if (String(food.food_id).startsWith('custom:')) continue;
+
         const { data: stockItem } = await supabase
           .from('stock')
           .select('quantity_grams')
@@ -82,6 +84,26 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({ meal: data });
 }
 
+// PATCH: edit an existing logged meal
+export async function PATCH(request: NextRequest) {
+  const body = await request.json();
+  const { meal_id, device_id, name, meal_type, nutrients, foods } = body;
+  if (!meal_id || !device_id) return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
+
+  const supabase = getServerSupabase();
+
+  const { data, error } = await supabase
+    .from('meals')
+    .update({ name, meal_type, nutrients, foods })
+    .eq('id', meal_id)
+    .eq('device_id', device_id)
+    .select()
+    .single();
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ meal: data });
+}
+
 export async function DELETE(request: NextRequest) {
   const deviceId = request.nextUrl.searchParams.get('device_id');
   const date = request.nextUrl.searchParams.get('date');
@@ -92,10 +114,8 @@ export async function DELETE(request: NextRequest) {
   const supabase = getServerSupabase();
 
   if (mealId) {
-    // Delete specific meal
     await supabase.from('meals').delete().eq('id', mealId).eq('device_id', deviceId);
   } else if (date) {
-    // Delete all meals for a date (reset day)
     await supabase.from('meals').delete().eq('device_id', deviceId).eq('date', date);
   }
 

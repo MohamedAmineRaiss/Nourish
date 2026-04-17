@@ -6,13 +6,23 @@ export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 
 export const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
 
-// Calorie distribution by meal type (fraction of daily target)
-// Dynamically adjusted based on what's already been eaten
 export const MEAL_TYPE_SHARE: Record<MealType, number> = {
   breakfast: 0.25,
   lunch: 0.35,
   dinner: 0.30,
   snack: 0.10,
+};
+
+// ─── Dietary Preferences ───
+export type DietaryPref = 'vegetarian' | 'vegan' | 'gluten-free' | 'dairy-free';
+
+export const DIETARY_PREFS: DietaryPref[] = ['vegetarian', 'vegan', 'gluten-free', 'dairy-free'];
+
+export const DIETARY_PREF_META: Record<DietaryPref, { icon: string; labelKey: string }> = {
+  'vegetarian': { icon: '🥬', labelKey: 'diet.vegetarian' },
+  'vegan':      { icon: '🌱', labelKey: 'diet.vegan' },
+  'gluten-free':{ icon: '🌾', labelKey: 'diet.glutenFree' },
+  'dairy-free': { icon: '🥛', labelKey: 'diet.dairyFree' },
 };
 
 // ─── Nutrient Keys ───
@@ -34,7 +44,6 @@ export const SECONDARY_NUTRIENTS: SecondaryNutrient[] = [
 
 export const ALL_NUTRIENTS: NutrientKey[] = [...PRIORITY_NUTRIENTS, ...SECONDARY_NUTRIENTS];
 
-// ─── Nutrient values map ───
 export type NutrientValues = Record<NutrientKey, number>;
 
 export function emptyNutrients(): NutrientValues {
@@ -44,14 +53,15 @@ export function emptyNutrients(): NutrientValues {
   };
 }
 
-// ─── Food item (normalized from any provider) ───
+// ─── Food Item ───
 export interface FoodItem {
   id: string;
-  source: 'nourish' | 'usda' | 'openfoodfacts' | 'mock';
+  source: 'nourish' | 'custom' | 'usda' | 'openfoodfacts' | 'mock';
   label: string;
   localLabel?: string;
   brand: string | null;
   category: string;
+  dietary_tags?: DietaryPref[];
   nutrientsPer100g: NutrientValues;
 }
 
@@ -65,12 +75,20 @@ export interface SelectedIngredient {
   grams: number;
 }
 
+// Rich explanation for suggestions
+export interface SuggestionContext {
+  strongIn: NutrientKey[];       // meal covers ≥80% of need
+  helpsWith: NutrientKey[];      // meal provides meaningful (≥30%) but not enough
+  balances: NutrientKey[];       // nutrient was previously over-consumed, this meal is lighter
+}
+
 export interface MealSuggestion {
   name: string;
   quantities: Record<string, number>;
   nutrients: NutrientValues;
   score: number;
   explanation: string;
+  context?: SuggestionContext;
   foods: FoodItem[];
 }
 
@@ -117,12 +135,30 @@ export interface WeeklyReport {
   days_tracked: number;
 }
 
+// ─── Trend data ───
+export interface DailyIntake {
+  date: string;              // YYYY-MM-DD
+  nutrients: NutrientValues;
+  meal_count: number;
+}
+
+// ─── Custom food (user-created) ───
+export interface CustomFoodInput {
+  label_en: string;
+  label_fr?: string;
+  label_ar?: string;
+  category: string;
+  dietary_tags: DietaryPref[];
+  nutrientsPer100g: NutrientValues;
+}
+
 // ─── User profile ───
 export interface UserProfile {
   id: string;
   name: string;
   language: Locale;
   targets: NutrientValues;
+  dietary_prefs?: DietaryPref[];
 }
 
 // ─── Nutrient display metadata ───

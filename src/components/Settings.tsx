@@ -5,6 +5,9 @@ import {
   NutrientValues,
   ALL_NUTRIENTS,
   NUTRIENT_META,
+  DietaryPref,
+  DIETARY_PREFS,
+  DIETARY_PREF_META,
 } from '@/types';
 import { t } from '@/lib/i18n';
 import Card from '@/components/Card';
@@ -18,6 +21,8 @@ type SettingsProps = {
   setLocale: (l: Locale) => void;
   editTargets: NutrientValues;
   setEditTargets: React.Dispatch<React.SetStateAction<NutrientValues>>;
+  dietaryPrefs: DietaryPref[];
+  setDietaryPrefs: React.Dispatch<React.SetStateAction<DietaryPref[]>>;
   saveSettings: () => void;
 };
 
@@ -28,8 +33,17 @@ export default function Settings({
   setLocale,
   editTargets,
   setEditTargets,
+  dietaryPrefs,
+  setDietaryPrefs,
   saveSettings,
 }: SettingsProps) {
+
+  const toggleDiet = (d: DietaryPref) => {
+    setDietaryPrefs(prev =>
+      prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d]
+    );
+  };
+
   return (
     <div className="flex flex-col gap-4 animate-page">
       <h2 className="font-display text-[22px] text-bark-500 dark:text-cream-100">
@@ -57,6 +71,36 @@ export default function Settings({
         <LanguageSwitcher locale={locale} setLocale={setLocale} />
       </Card>
 
+      {/* Dietary preferences */}
+      <Card>
+        <h3 className="font-display text-[15px] text-bark-500 dark:text-cream-200 mb-1">
+          {t('settings.dietary', locale)}
+        </h3>
+        <p className="font-body text-[11px] text-bark-200 dark:text-bark-100 mb-3">
+          {t('settings.dietaryHint', locale)}
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {DIETARY_PREFS.map(d => {
+            const meta = DIETARY_PREF_META[d];
+            const active = dietaryPrefs.includes(d);
+            return (
+              <button
+                key={d}
+                onClick={() => toggleDiet(d)}
+                aria-pressed={active}
+                className={`px-3.5 py-2 rounded-full font-body text-[13px] font-semibold border transition-all ${
+                  active
+                    ? 'bg-terra-500 text-white border-terra-500 shadow-md shadow-terra-500/20'
+                    : 'bg-cream-100 dark:bg-bark-500 text-bark-500 dark:text-cream-200 border-cream-300 dark:border-bark-400'
+                }`}
+              >
+                {meta.icon} {t(meta.labelKey, locale)}
+              </button>
+            );
+          })}
+        </div>
+      </Card>
+
       <Card>
         <h3 className="font-display text-[15px] text-bark-500 dark:text-cream-200 mb-1">
           {t('settings.targets', locale)}
@@ -80,17 +124,11 @@ export default function Settings({
                   onFocus={(e) => e.target.select()}
                   onChange={(e) => {
                     const value = e.target.value;
-
                     if (value === '') {
-                      setEditTargets((prev) => ({
-                        ...prev,
-                        [n]: 0,
-                      }));
+                      setEditTargets((prev) => ({ ...prev, [n]: 0 }));
                       return;
                     }
-
                     const parsed = parseFloat(value);
-
                     setEditTargets((prev) => ({
                       ...prev,
                       [n]: Number.isNaN(parsed) ? 0 : Math.max(0, parsed),
@@ -109,6 +147,17 @@ export default function Settings({
           ⚕️ <strong>{t('settings.healthNote', locale)}</strong>
         </p>
       </Card>
+
+      <Btn
+        variant="ghost"
+        onClick={() => {
+          localStorage.removeItem('nourish_onboarded');
+          window.location.reload();
+        }}
+        className="w-full"
+      >
+        📖 {t('settings.resetOnboarding', locale)}
+      </Btn>
 
       <Btn onClick={saveSettings} className="w-full">
         💾 {t('settings.save', locale)}

@@ -23,7 +23,13 @@ export async function GET(request: NextRequest) {
 
     if (!data) {
       return NextResponse.json({
-        profile: { device_id: deviceId, name: 'Mama', language: 'en', targets: DEFAULT_TARGETS },
+        profile: {
+          device_id: deviceId,
+          name: 'Mama',
+          language: 'en',
+          targets: DEFAULT_TARGETS,
+          dietary_prefs: [],
+        },
         isNew: true,
       });
     }
@@ -31,7 +37,13 @@ export async function GET(request: NextRequest) {
   } catch (err: any) {
     console.error('Profile GET error:', err);
     return NextResponse.json({
-      profile: { device_id: deviceId, name: 'Mama', language: 'en', targets: DEFAULT_TARGETS },
+      profile: {
+        device_id: deviceId,
+        name: 'Mama',
+        language: 'en',
+        targets: DEFAULT_TARGETS,
+        dietary_prefs: [],
+      },
       isNew: true,
     });
   }
@@ -39,17 +51,26 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
-  const { device_id, name, language, targets } = body;
+  const { device_id, name, language, targets, dietary_prefs } = body;
   if (!device_id) return NextResponse.json({ error: 'Missing device_id' }, { status: 400 });
 
   try {
     const supabase = getServerSupabase();
+    const payload: any = {
+      device_id,
+      name,
+      language,
+      targets,
+      updated_at: new Date().toISOString(),
+    };
+    // Only include dietary_prefs if provided (so we don't wipe it on partial saves)
+    if (Array.isArray(dietary_prefs)) {
+      payload.dietary_prefs = dietary_prefs;
+    }
+
     const { data, error } = await supabase
       .from('profiles')
-      .upsert(
-        { device_id, name, language, targets, updated_at: new Date().toISOString() },
-        { onConflict: 'device_id' },
-      )
+      .upsert(payload, { onConflict: 'device_id' })
       .select()
       .single();
 
