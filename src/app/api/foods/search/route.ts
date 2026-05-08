@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSupabase } from '@/lib/supabaseServer';
-import { FoodItem, NutrientValues, DietaryPref } from '@/types';
+import { FoodItem, NutrientValues } from '@/types';
 
 export const dynamic = 'force-dynamic';
 
-function rowToFoodItem(row: any, lang: string, source: 'nourish' | 'custom'): FoodItem {
+function rowToFoodItem(row: any, lang: string, source: 'moroccan' | 'custom' | 'off'): FoodItem {
   const nutrients: NutrientValues = {
     calories: row.calories || 0,
     protein: row.protein || 0,
@@ -34,7 +34,7 @@ function rowToFoodItem(row: any, lang: string, source: 'nourish' | 'custom'): Fo
     label,
     brand: null,
     category: category || 'Other',
-    dietary_tags: (row.dietary_tags || []) as DietaryPref[],
+    priority: row.priority,
     nutrientsPer100g: nutrients,
   };
 }
@@ -43,8 +43,6 @@ export async function GET(request: NextRequest) {
   const q = request.nextUrl.searchParams.get('q');
   const lang = request.nextUrl.searchParams.get('lang') || 'en';
   const deviceId = request.nextUrl.searchParams.get('device_id');
-  // dietary: comma-separated list e.g. "vegetarian,gluten-free"
-  const dietary = request.nextUrl.searchParams.get('dietary');
   const category = request.nextUrl.searchParams.get('category');
 
   if (!q || q.trim().length < 2) {
@@ -52,12 +50,11 @@ export async function GET(request: NextRequest) {
   }
 
   const query = q.trim().toLowerCase();
-  const dietaryFilters = dietary ? dietary.split(',').filter(Boolean) : [];
 
   try {
     const supabase = getServerSupabase();
 
-    // ─── Main food DB search ───
+    // Main foods: search across labels + synonyms
     let mainQuery = supabase
       .from('foods')
       .select('*')
@@ -68,32 +65,28 @@ export async function GET(request: NextRequest) {
         `category.ilike.%${query}%`,
         `category_fr.ilike.%${query}%`,
         `category_ar.ilike.%${query}%`,
-        `synonyms.cs.{${query}}`,  // contains-string array match on synonyms
+        `synonyms.cs.{${query}}`,
       ].join(','))
-      .limit(30);
+      .order('priority', { ascending: false })    // whole foods first!
+      .order('label_en', { ascending: true })
+      .limit(40);
 
-    // Apply dietary filter (food must contain ALL selected tags)
-    if (dietaryFilters.length > 0) {
-      mainQuery = mainQuery.contains('dietary_tags', dietaryFilters);
-    }
-
-    // Category filter
     if (category) {
       mainQuery = mainQuery.or(`category.eq.${category},category_fr.eq.${category},category_ar.eq.${category}`);
     }
 
-    const { data: mainData, error } = await mainQuery.order('label_en');
+    const { data: mainData, error } = await mainQuery;
 
-    if (error) {
-      console.error('Foods search error:', error);
-      // Keep going — still try custom
-    }
+    if (error) console.error('Foods search error:', error);
 
-    let results: FoodItem[] = (mainData || []).map(r => rowToFoodItem(r, lang, 'nourish'));
+    let results: FoodItem[] = (mainData || []).map(r => {
+      const src = r.source === 'off' ? 'off' : 'moroccan';
+      return rowToFoodItem(r, lang, src as 'moroccan' | 'off');
+    });
 
-    // ─── Custom foods (device-owned) ───
+    // Custom user foods — always shown first when matching
     if (deviceId) {
-      let customQuery = supabase
+      const { data: customData } = await supabase
         .from('custom_foods')
         .select('*')
         .eq('device_id', deviceId)
@@ -104,14 +97,9 @@ export async function GET(request: NextRequest) {
         ].join(','))
         .limit(10);
 
-      if (dietaryFilters.length > 0) {
-        customQuery = customQuery.contains('dietary_tags', dietaryFilters);
-      }
-
-      const { data: customData } = await customQuery;
       if (customData) {
         const customItems = customData.map(r => rowToFoodItem(r, lang, 'custom'));
-        results = [...customItems, ...results]; // customs first
+        results = [...customItems, ...results];
       }
     }
 

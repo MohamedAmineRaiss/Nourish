@@ -3,15 +3,17 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   FoodItem, NutrientValues, MealSuggestion, LoggedMeal, MealType,
-  NutrientKey, Locale, DietaryPref,
+  NutrientKey, Locale, NutritionFilter, BodyMetrics,
   PRIORITY_NUTRIENTS, SECONDARY_NUTRIENTS, ALL_NUTRIENTS,
   NUTRIENT_META, DEFAULT_TARGETS, emptyNutrients,
 } from '@/types';
 import { t, isRTL } from '@/lib/i18n';
 import { getDeviceId } from '@/lib/supabase';
 import { generateCombinations } from '@/lib/recommendationEngine';
+import { computeTargets } from '@/lib/nutritionCalculator';
 
 import Onboarding, { hasOnboarded } from '@/components/Onboarding';
+import UpdateNotice, { shouldShowUpdateNotice } from '@/components/UpdateNotice';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import NutrientRing from '@/components/NutrientRing';
 import NutrientBar from '@/components/NutrientBar';
@@ -34,13 +36,23 @@ function greetingKey(): string {
   return h < 12 ? 'greeting.morning' : h < 17 ? 'greeting.afternoon' : 'greeting.evening';
 }
 
+// Only keep NutritionFilter values that are still recognized (drops legacy 'vegetarian' etc.)
+const VALID_FILTERS: Set<string> = new Set([
+  'high-protein', 'low-carb', 'high-iron', 'low-calorie', 'high-fiber',
+]);
+function sanitizeFilters(arr: any): NutritionFilter[] {
+  if (!Array.isArray(arr)) return [];
+  return arr.filter((x) => typeof x === 'string' && VALID_FILTERS.has(x)) as NutritionFilter[];
+}
+
 export default function App() {
   const [page, setPage] = useState('dashboard');
   const [locale, setLocaleState] = useState<Locale>('en');
   const [profileName, setProfileName] = useState('Mama');
   const [targets, setTargets] = useState<NutrientValues>({ ...DEFAULT_TARGETS });
   const [editTargets, setEditTargets] = useState<NutrientValues>({ ...DEFAULT_TARGETS });
-  const [dietaryPrefs, setDietaryPrefs] = useState<DietaryPref[]>([]);
+  const [nutritionFilterPrefs, setNutritionFilterPrefs] = useState<NutritionFilter[]>([]);
+  const [bodyMetrics, setBodyMetrics] = useState<BodyMetrics>({});
   const [dailyIntake, setDailyIntake] = useState<NutrientValues>(emptyNutrients());
   const [meals, setMeals] = useState<LoggedMeal[]>([]);
   const [selectedFoods, setSelectedFoods] = useState<FoodItem[]>([]);
@@ -49,12 +61,13 @@ export default function App() {
   const [searching, setSearching] = useState(false);
   const [searchSource, setSearchSource] = useState('');
   const [mealType, setMealType] = useState<MealType>('lunch');
-  const [dietaryFilters, setDietaryFilters] = useState<DietaryPref[]>([]);
+  const [nutritionFilters, setNutritionFilters] = useState<NutritionFilter[]>([]);
   const [suggestions, setSuggestions] = useState<MealSuggestion[]>([]);
   const [chosenSuggestion, setChosenSuggestion] = useState<MealSuggestion | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showUpdate, setShowUpdate] = useState(false);
   const [initError, setInitError] = useState('');
   const searchTimer = useRef<any>(null);
   const deviceId = useRef<string>('');
@@ -72,7 +85,6 @@ export default function App() {
 
   const setLocale = useCallback((l: Locale) => { setLocaleState(l); }, []);
 
-  // ─── Load today's meals ───
   const refreshTodayMeals = useCallback(async () => {
     try {
       const res = await fetch(`/api/meals?device_id=${deviceId.current}&date=${todayStr()}`);
@@ -91,11 +103,11 @@ export default function App() {
     } catch (err) { console.error('Refresh meals error:', err); }
   }, []);
 
-  // ─── Init ───
   useEffect(() => {
     async function init() {
       deviceId.current = getDeviceId();
-      if (!hasOnboarded()) setShowOnboarding(true);
+      const needsOnboard = !hasOnboarded();
+      if (needsOnboard) setShowOnboarding(true);
 
       try {
         const profRes = await fetch(`/api/profile?device_id=${deviceId.current}`);
@@ -108,8 +120,11 @@ export default function App() {
             setTargets({ ...DEFAULT_TARGETS, ...profData.profile.targets });
             setEditTargets({ ...DEFAULT_TARGETS, ...profData.profile.targets });
           }
-          if (Array.isArray(profData.profile.dietary_prefs)) {
-            setDietaryPrefs(profData.profile.dietary_prefs);
+          // Sanitize filter prefs: drops any legacy 'vegetarian' etc. values
+          const clean = sanitizeFilters(profData.profile.dietary_prefs);
+          setNutritionFilterPrefs(clean);
+          if (profData.profile.body_metrics) {
+            setBodyMetrics(profData.profile.body_metrics);
           }
         }
         await refreshTodayMeals();
@@ -118,11 +133,16 @@ export default function App() {
         setInitError(err.message || 'Failed to load');
       }
       setLoaded(true);
+
+      // Show update notice only after onboarding is complete and if it's the first time seeing v2.2
+      if (!needsOnboard && shouldShowUpdateNotice()) {
+        setShowUpdate(true);
+      }
     }
     init();
   }, [refreshTodayMeals]);
 
-  // ─── Search (with dietary filter) ───
+  // Search (no dietary param — filtering is client-side now)
   const doSearch = useCallback((q: string) => {
     if (searchTimer.current) clearTimeout(searchTimer.current);
     if (q.trim().length < 2) { setSearchResults([]); setSearching(false); return; }
@@ -133,9 +153,6 @@ export default function App() {
           q, lang: locale,
           device_id: deviceId.current,
         });
-        if (dietaryFilters.length > 0) {
-          params.set('dietary', dietaryFilters.join(','));
-        }
         const res = await fetch(`/api/foods/search?${params.toString()}`);
         const data = await res.json();
         setSearchResults(data.foods || []);
@@ -143,11 +160,10 @@ export default function App() {
       } catch { setSearchResults([]); }
       setSearching(false);
     }, 350);
-  }, [locale, dietaryFilters]);
+  }, [locale]);
 
   useEffect(() => { doSearch(searchQuery); }, [searchQuery, doSearch]);
 
-  // ─── Actions ───
   const addFood = (food: FoodItem) => {
     if (!selectedFoods.find(f => f.id === food.id)) setSelectedFoods(prev => [...prev, food]);
     setSearchQuery(''); setSearchResults([]);
@@ -205,6 +221,14 @@ export default function App() {
     } catch { }
   };
 
+  // Apply computed targets from the body-metrics form
+  const applyComputedTargets = useCallback(() => {
+    const computed = computeTargets(bodyMetrics);
+    if (!computed) return;
+    setEditTargets(computed);
+    showToast(t('toast.targetsApplied', locale));
+  }, [bodyMetrics, locale, showToast]);
+
   const saveSettings = async () => {
     setTargets({ ...editTargets });
     showToast(t('toast.settingsSaved', locale));
@@ -218,7 +242,8 @@ export default function App() {
           name: profileName,
           language: locale,
           targets: editTargets,
-          dietary_prefs: dietaryPrefs,
+          dietary_prefs: nutritionFilterPrefs,
+          body_metrics: bodyMetrics,
         }),
       });
     } catch { }
@@ -226,7 +251,6 @@ export default function App() {
 
   const nutrientLabel = (key: NutrientKey): string => t(NUTRIENT_META[key].label, locale);
 
-  // ═══ DASHBOARD ═══
   const Dashboard = () => {
     const topMissing = ALL_NUTRIENTS
       .filter(n => targets[n] > 0 && (dailyIntake[n] / targets[n]) < 0.7)
@@ -298,7 +322,6 @@ export default function App() {
     );
   };
 
-  // ═══ SUGGESTIONS (enhanced with context) ═══
   const Suggestions = () => (
     <div className="flex flex-col gap-4 animate-page">
       <h2 className="font-display text-[22px] text-bark-500 dark:text-cream-100">{t('suggestions.title', locale)}</h2>
@@ -317,8 +340,6 @@ export default function App() {
                 <h4 className="font-display text-[16px] text-bark-500 dark:text-cream-200">
                   {t('suggestions.option', locale)} {i + 1}
                 </h4>
-
-                {/* Rich context badges */}
                 <div className="flex flex-col gap-1 mt-1.5">
                   {strongIn.length > 0 && (
                     <div className="flex flex-wrap items-center gap-1">
@@ -384,7 +405,6 @@ export default function App() {
     </div>
   );
 
-  // ═══ PAGE MAP ═══
   const pages: Record<string, React.ReactNode> = {
     dashboard: <Dashboard />,
     plan: (
@@ -395,7 +415,7 @@ export default function App() {
         searching={searching} searchResults={searchResults} searchSource={searchSource}
         selectedFoods={selectedFoods} addFood={addFood} removeFood={removeFood}
         doGenerate={doGenerate} mealType={mealType} setMealType={setMealType}
-        dietaryFilters={dietaryFilters} setDietaryFilters={setDietaryFilters}
+        nutritionFilters={nutritionFilters} setNutritionFilters={setNutritionFilters}
       />
     ),
     suggestions: <Suggestions />,
@@ -423,7 +443,7 @@ export default function App() {
       <MealSuggester
         locale={locale} deviceId={deviceId.current}
         dailyIntake={dailyIntake} targets={targets}
-        dietaryPrefs={dietaryPrefs}
+        nutritionFilters={nutritionFilterPrefs}
       />
     ),
     weekly: <WeeklyReport locale={locale} deviceId={deviceId.current} targets={targets} onBack={() => setPage('dashboard')} />,
@@ -431,24 +451,31 @@ export default function App() {
       <Settings
         locale={locale} profileName={profileName} setProfileName={setProfileName}
         setLocale={setLocale} editTargets={editTargets} setEditTargets={setEditTargets}
-        dietaryPrefs={dietaryPrefs} setDietaryPrefs={setDietaryPrefs}
+        nutritionFilters={nutritionFilterPrefs} setNutritionFilters={setNutritionFilterPrefs}
+        bodyMetrics={bodyMetrics} setBodyMetrics={setBodyMetrics}
+        applyComputedTargets={applyComputedTargets}
         saveSettings={saveSettings}
       />
     ),
   };
 
-  // ─── Onboarding ───
   if (showOnboarding) {
     return (
       <Onboarding
         locale={locale}
         setLocale={setLocale}
-        onComplete={() => setShowOnboarding(false)}
+        onComplete={() => {
+          setShowOnboarding(false);
+          // First-time users don't need v2.2 notice — mark it seen
+          if (shouldShowUpdateNotice()) {
+            // mark the v2.2 notice as seen for brand-new users
+            localStorage.setItem('nourish_version_seen_v22', '1');
+          }
+        }}
       />
     );
   }
 
-  // ─── Loading ───
   if (!loaded) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--page-bg)' }}>
@@ -460,7 +487,6 @@ export default function App() {
     );
   }
 
-  // ─── Error ───
   if (initError) {
     return (
       <div className="min-h-screen flex items-center justify-center px-8" style={{ background: 'var(--page-bg)' }}>
@@ -498,6 +524,8 @@ export default function App() {
           {pages[page] || <Dashboard />}
         </main>
         <BottomNav page={page} setPage={setPage} locale={locale} />
+
+        {showUpdate && <UpdateNotice locale={locale} onDismiss={() => setShowUpdate(false)} />}
       </div>
     </ErrorBoundary>
   );

@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import {
-  Locale, NutrientValues, DietaryPref, DIETARY_PREFS, DIETARY_PREF_META,
-  NUTRIENT_META, ALL_NUTRIENTS, PRIORITY_NUTRIENTS, SECONDARY_NUTRIENTS,
+  Locale, NutrientValues,
+  NUTRIENT_META, PRIORITY_NUTRIENTS, SECONDARY_NUTRIENTS,
   emptyNutrients, FoodItem,
 } from '@/types';
 import { t, isRTL } from '@/lib/i18n';
@@ -18,8 +18,9 @@ type Props = {
 };
 
 const CATEGORIES = [
-  'Meat', 'Fish', 'Vegetable', 'Fruit', 'Legume',
-  'Dairy & Eggs', 'Grain', 'Nut', 'Other',
+  'Meat & Poultry', 'Fish & Seafood', 'Vegetables', 'Fruits', 'Legumes',
+  'Dairy & Eggs', 'Grains & Cereals', 'Nuts & Seeds', 'Herbs & Spices',
+  'Condiments & Sauces', 'Oils & Fats', 'Prepared Dishes', 'Other',
 ];
 
 export default function CustomFoodDialog({ locale, deviceId, onClose, onCreated }: Props) {
@@ -27,15 +28,10 @@ export default function CustomFoodDialog({ locale, deviceId, onClose, onCreated 
   const [labelFr, setLabelFr] = useState('');
   const [labelAr, setLabelAr] = useState('');
   const [category, setCategory] = useState('Other');
-  const [tags, setTags] = useState<DietaryPref[]>([]);
   const [nutrients, setNutrients] = useState<NutrientValues>(emptyNutrients());
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-
-  const toggleTag = (tag: DietaryPref) => {
-    setTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
-  };
 
   const updateNutrient = (key: keyof NutrientValues, value: string) => {
     const parsed = parseFloat(value);
@@ -65,7 +61,6 @@ export default function CustomFoodDialog({ locale, deviceId, onClose, onCreated 
           label_fr: labelFr.trim() || primaryLabel,
           label_ar: labelAr.trim() || primaryLabel,
           category,
-          dietary_tags: tags,
           nutrientsPer100g: nutrients,
         }),
       });
@@ -80,7 +75,6 @@ export default function CustomFoodDialog({ locale, deviceId, onClose, onCreated 
           label: locale === 'fr' ? data.food.label_fr : locale === 'ar' ? data.food.label_ar : data.food.label_en,
           brand: null,
           category: data.food.category,
-          dietary_tags: data.food.dietary_tags,
           nutrientsPer100g: {
             calories: data.food.calories, protein: data.food.protein, fat: data.food.fat,
             carbs: data.food.carbs, fiber: data.food.fiber, iron: data.food.iron,
@@ -115,13 +109,7 @@ export default function CustomFoodDialog({ locale, deviceId, onClose, onCreated 
           <h2 className="font-display text-[20px] text-bark-500 dark:text-cream-100">
             ✏️ {t('custom.title', locale)}
           </h2>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-full bg-cream-200 dark:bg-bark-400 flex items-center justify-center text-bark-500 dark:text-cream-200"
-            aria-label={t('common.close', locale)}
-          >
-            ✕
-          </button>
+          <button onClick={onClose} className="w-8 h-8 rounded-full bg-cream-200 dark:bg-bark-400 flex items-center justify-center" aria-label={t('common.close', locale)}>✕</button>
         </div>
 
         <div className="px-5 py-4 flex flex-col gap-4">
@@ -129,7 +117,6 @@ export default function CustomFoodDialog({ locale, deviceId, onClose, onCreated 
             {t('custom.subtitle', locale)}
           </p>
 
-          {/* Names */}
           <Card>
             <h3 className="font-display text-[14px] text-bark-500 dark:text-cream-200 mb-2">
               {t('custom.names', locale)}
@@ -168,7 +155,6 @@ export default function CustomFoodDialog({ locale, deviceId, onClose, onCreated 
             </div>
           </Card>
 
-          {/* Category */}
           <Card>
             <h3 className="font-display text-[14px] text-bark-500 dark:text-cream-200 mb-2">
               {t('custom.category', locale)}
@@ -190,34 +176,6 @@ export default function CustomFoodDialog({ locale, deviceId, onClose, onCreated 
             </div>
           </Card>
 
-          {/* Dietary tags */}
-          <Card>
-            <h3 className="font-display text-[14px] text-bark-500 dark:text-cream-200 mb-2">
-              {t('custom.dietary', locale)}
-            </h3>
-            <div className="flex flex-wrap gap-1.5">
-              {DIETARY_PREFS.map(tag => {
-                const meta = DIETARY_PREF_META[tag];
-                const active = tags.includes(tag);
-                return (
-                  <button
-                    key={tag}
-                    onClick={() => toggleTag(tag)}
-                    aria-pressed={active}
-                    className={`px-3 py-1.5 rounded-full font-body text-[12px] font-semibold border transition-all ${
-                      active
-                        ? 'bg-terra-500 text-white border-terra-500'
-                        : 'bg-cream-100 dark:bg-bark-500 text-bark-500 dark:text-cream-200 border-cream-300 dark:border-bark-400'
-                    }`}
-                  >
-                    {meta.icon} {t(meta.labelKey, locale)}
-                  </button>
-                );
-              })}
-            </div>
-          </Card>
-
-          {/* Priority nutrients */}
           <Card>
             <h3 className="font-display text-[14px] text-bark-500 dark:text-cream-200 mb-1">
               {t('custom.nutrientsPer100g', locale)}
@@ -292,7 +250,7 @@ export default function CustomFoodDialog({ locale, deviceId, onClose, onCreated 
               {t('common.cancel', locale)}
             </Btn>
             <Btn onClick={save} disabled={saving} className="flex-1">
-              {saving ? `${t('toast.saving', locale)}` : `💾 ${t('common.save', locale)}`}
+              {saving ? t('toast.saving', locale) : `💾 ${t('common.save', locale)}`}
             </Btn>
           </div>
         </div>

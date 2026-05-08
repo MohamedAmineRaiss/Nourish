@@ -4,12 +4,22 @@ import { callGeminiJSON } from '@/lib/gemini';
 
 export const dynamic = 'force-dynamic';
 
+// Human-readable filter descriptions (English, used in the AI prompt)
+const FILTER_DESC: Record<string, string> = {
+  'high-protein': 'high in protein (≥20g per 100g)',
+  'low-carb': 'low-carb / keto-friendly (≤10g carbs per 100g)',
+  'high-iron': 'iron-rich (≥3mg per 100g)',
+  'low-calorie': 'low-calorie (≤100 kcal per 100g)',
+  'high-fiber': 'high in fiber (≥5g per 100g)',
+};
+
 export async function POST(request: NextRequest) {
   const body = await request.json();
   const {
     device_id, lang, mode, ingredients, meal_type,
     daily_intake, targets,
-    dietary_prefs, // array like ["vegetarian", "gluten-free"]
+    nutrition_filters,      // e.g. ["high-protein", "high-iron"]
+    dietary_prefs,          // legacy alias
   } = body;
 
   const geminiKey = process.env.GEMINI_API_KEY;
@@ -48,16 +58,17 @@ export async function POST(request: NextRequest) {
   const intakeStr = daily_intake ? `Already eaten today: ${JSON.stringify(daily_intake)}` : '';
   const targetsStr = targets ? `Daily targets: ${JSON.stringify(targets)}` : '';
 
-  // Dietary preference constraints
-  const dietaryStr = dietary_prefs && dietary_prefs.length > 0
-    ? `IMPORTANT: All suggested meals MUST be ${dietary_prefs.join(' AND ')}.`
+  // Nutrition filter prioritization — softer than old dietary constraints
+  const filters = (nutrition_filters || dietary_prefs || []) as string[];
+  const filterStr = filters.length > 0
+    ? `PRIORITY: Favor meals that are ${filters.map(f => FILTER_DESC[f] || f).join(' AND ')}.`
     : '';
 
   const prompt = `You are a Moroccan family meal planner. Suggest 3 simple, practical ${mealTypeLabel} meals using ONLY these available ingredients:
 
 ${availableIngredients.join('\n')}
 
-${dietaryStr}
+${filterStr}
 ${intakeStr}
 ${targetsStr}
 

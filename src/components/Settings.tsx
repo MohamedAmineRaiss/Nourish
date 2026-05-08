@@ -5,14 +5,16 @@ import {
   NutrientValues,
   ALL_NUTRIENTS,
   NUTRIENT_META,
-  DietaryPref,
-  DIETARY_PREFS,
-  DIETARY_PREF_META,
+  NutritionFilter,
+  NUTRITION_FILTERS,
+  NUTRITION_FILTER_META,
+  BodyMetrics,
 } from '@/types';
 import { t } from '@/lib/i18n';
 import Card from '@/components/Card';
 import Btn from '@/components/Btn';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
+import BodyMetricsForm from '@/components/BodyMetricsForm';
 
 type SettingsProps = {
   locale: Locale;
@@ -21,8 +23,11 @@ type SettingsProps = {
   setLocale: (l: Locale) => void;
   editTargets: NutrientValues;
   setEditTargets: React.Dispatch<React.SetStateAction<NutrientValues>>;
-  dietaryPrefs: DietaryPref[];
-  setDietaryPrefs: React.Dispatch<React.SetStateAction<DietaryPref[]>>;
+  nutritionFilters: NutritionFilter[];
+  setNutritionFilters: React.Dispatch<React.SetStateAction<NutritionFilter[]>>;
+  bodyMetrics: BodyMetrics;
+  setBodyMetrics: React.Dispatch<React.SetStateAction<BodyMetrics>>;
+  applyComputedTargets: () => void;
   saveSettings: () => void;
 };
 
@@ -33,14 +38,17 @@ export default function Settings({
   setLocale,
   editTargets,
   setEditTargets,
-  dietaryPrefs,
-  setDietaryPrefs,
+  nutritionFilters,
+  setNutritionFilters,
+  bodyMetrics,
+  setBodyMetrics,
+  applyComputedTargets,
   saveSettings,
 }: SettingsProps) {
 
-  const toggleDiet = (d: DietaryPref) => {
-    setDietaryPrefs(prev =>
-      prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d]
+  const toggleFilter = (f: NutritionFilter) => {
+    setNutritionFilters(prev =>
+      prev.includes(f) ? prev.filter(x => x !== f) : [...prev, f]
     );
   };
 
@@ -71,23 +79,40 @@ export default function Settings({
         <LanguageSwitcher locale={locale} setLocale={setLocale} />
       </Card>
 
-      {/* Dietary preferences */}
+      {/* Body metrics calculator */}
       <Card>
         <h3 className="font-display text-[15px] text-bark-500 dark:text-cream-200 mb-1">
-          {t('settings.dietary', locale)}
+          🧮 {t('body.title', locale)}
         </h3>
         <p className="font-body text-[11px] text-bark-200 dark:text-bark-100 mb-3">
-          {t('settings.dietaryHint', locale)}
+          {t('body.subtitle', locale)}
+        </p>
+        <BodyMetricsForm
+          locale={locale}
+          metrics={bodyMetrics}
+          setMetrics={setBodyMetrics}
+          onApply={applyComputedTargets}
+        />
+      </Card>
+
+      {/* Nutrition filter prefs */}
+      <Card>
+        <h3 className="font-display text-[15px] text-bark-500 dark:text-cream-200 mb-1">
+          {t('settings.filters', locale)}
+        </h3>
+        <p className="font-body text-[11px] text-bark-200 dark:text-bark-100 mb-3">
+          {t('settings.filtersHint', locale)}
         </p>
         <div className="flex flex-wrap gap-2">
-          {DIETARY_PREFS.map(d => {
-            const meta = DIETARY_PREF_META[d];
-            const active = dietaryPrefs.includes(d);
+          {NUTRITION_FILTERS.map(f => {
+            const meta = NUTRITION_FILTER_META[f];
+            const active = nutritionFilters.includes(f);
             return (
               <button
-                key={d}
-                onClick={() => toggleDiet(d)}
+                key={f}
+                onClick={() => toggleFilter(f)}
                 aria-pressed={active}
+                title={t(meta.descKey, locale)}
                 className={`px-3.5 py-2 rounded-full font-body text-[13px] font-semibold border transition-all ${
                   active
                     ? 'bg-terra-500 text-white border-terra-500 shadow-md shadow-terra-500/20'
@@ -152,6 +177,7 @@ export default function Settings({
         variant="ghost"
         onClick={() => {
           localStorage.removeItem('nourish_onboarded');
+          localStorage.removeItem('nourish_version_seen_v22');
           window.location.reload();
         }}
         className="w-full"

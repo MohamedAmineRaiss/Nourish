@@ -24,7 +24,6 @@ export async function POST(request: NextRequest) {
     device_id,
     label_en, label_fr, label_ar,
     category,
-    dietary_tags,
     nutrientsPer100g,
   } = body;
 
@@ -43,7 +42,6 @@ export async function POST(request: NextRequest) {
       label_fr: label_fr || label_en,
       label_ar: label_ar || label_en,
       category: category || 'Other',
-      dietary_tags: dietary_tags || [],
       calories: n.calories || 0,
       protein: n.protein || 0,
       fat: n.fat || 0,

@@ -1,7 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { Locale, MealType, NutrientValues, MEAL_TYPES, DietaryPref } from '@/types';
+import {
+  Locale, MealType, NutrientValues, MEAL_TYPES,
+  NutritionFilter, NUTRITION_FILTER_META,
+} from '@/types';
 import { t } from '@/lib/i18n';
 import Card from '@/components/Card';
 import Btn from '@/components/Btn';
@@ -11,7 +14,7 @@ type MealSuggesterProps = {
   deviceId: string;
   dailyIntake: NutrientValues;
   targets: NutrientValues;
-  dietaryPrefs: DietaryPref[];
+  nutritionFilters: NutritionFilter[];
 };
 
 interface SuggestedMeal {
@@ -24,7 +27,7 @@ interface SuggestedMeal {
   nutrition_note?: string;
 }
 
-export default function MealSuggester({ locale, deviceId, dailyIntake, targets, dietaryPrefs }: MealSuggesterProps) {
+export default function MealSuggester({ locale, deviceId, dailyIntake, targets, nutritionFilters }: MealSuggesterProps) {
   const [mode, setMode] = useState<'stock' | 'custom'>('stock');
   const [mealType, setMealType] = useState<MealType>('lunch');
   const [customIngredients, setCustomIngredients] = useState('');
@@ -53,7 +56,7 @@ export default function MealSuggester({ locale, deviceId, dailyIntake, targets, 
           meal_type: mealType,
           daily_intake: dailyIntake,
           targets,
-          dietary_prefs: dietaryPrefs,
+          nutrition_filters: nutritionFilters,
         }),
       });
 
@@ -78,14 +81,13 @@ export default function MealSuggester({ locale, deviceId, dailyIntake, targets, 
         {t('suggest.subtitle', locale)}
       </p>
 
-      {/* Dietary pref hint */}
-      {dietaryPrefs.length > 0 && (
+      {nutritionFilters.length > 0 && (
         <p className="font-body text-[11px] text-terra-500 font-semibold -mt-2">
-          ✓ {t('suggest.respectingDiet', locale)}: {dietaryPrefs.join(', ')}
+          ✓ {t('suggest.respectingFilters', locale)}:{' '}
+          {nutritionFilters.map(f => t(NUTRITION_FILTER_META[f].labelKey, locale)).join(', ')}
         </p>
       )}
 
-      {/* Mode */}
       <div className="flex gap-2">
         {(['stock', 'custom'] as const).map(m => (
           <button
@@ -102,7 +104,6 @@ export default function MealSuggester({ locale, deviceId, dailyIntake, targets, 
         ))}
       </div>
 
-      {/* Meal type */}
       <div className="flex gap-2">
         {MEAL_TYPES.map(mt => (
           <button
@@ -142,7 +143,6 @@ export default function MealSuggester({ locale, deviceId, dailyIntake, targets, 
         <Card key={i}>
           <div className="flex justify-between items-start mb-1 gap-2">
             <h3 className="font-display text-[16px] text-bark-500 dark:text-cream-200">{meal.name}</h3>
-            {/* Quick badges: prep time + simplicity */}
             <div className="flex items-center gap-1 flex-shrink-0">
               {typeof meal.prep_minutes === 'number' && (
                 <span className="bg-cream-200 dark:bg-bark-400 rounded-lg px-2 py-0.5 font-body text-[11px] font-semibold text-bark-500 dark:text-cream-200">
